@@ -45,7 +45,7 @@ class ipt-toolkit (
     mode           => '0700',
     owner	   => $tomcatuser,
     group	   => $tomcatgroup,
-    require	   => File[$datarootdirs],
+    require	   => [File[$datarootdirs],Class['tomcat']],
   }
   
   class { "tomcat": 
