@@ -1,47 +1,39 @@
 # == Class: ipt-toolkit
 #
-# Full description of class ipt-toolkit here.
-#
-# === Parameters
-#
-# Document parameters here.
-#
-# [*sample_parameter*]
-#   Explanation of what this parameter affects and what it defaults to.
-#   e.g. "Specify one or more upstream ntp servers as an array."
-#
-# === Variables
-#
-# Here you should define a list of variables that this module would require.
-#
-# [*sample_variable*]
-#   Explanation of how this variable affects the funtion of this class and if
-#   it has a default. e.g. "The parameter enc_ntp_servers must be set by the
-#   External Node Classifier as a comma separated list of hostnames." (Note,
-#   global variables should be avoided in favor of class parameters as
-#   of Puppet 2.6.)
-#
-# === Examples
-#
-#  class { ipt-toolkit:
-#    servers => [ 'pool.ntp.org', 'ntp.local.company.com' ],
-#  }
+# ipt-toolkit puppet manifest
 #
 # === Authors
 #
-# Author Name <author@domain.com>
+# Author Name <hugo.vanduijn@naturalis.nl>
 #
-# === Copyright
-#
-# Copyright 2013 Your name here, unless otherwise noted.
 #
 class ipt-toolkit (
+  $sitename		= 'develop.cloud.naturalis.nl',
+  $proxyvhostpriority	= 10,
+  $proxysite		= true,
+  $proxyport		= 80,
   $datadir 		= '/data/ipt',
   $datarootdirs 	= ['/data'],
   $iptsource 		= 'https://gbif-providertoolkit.googlecode.com/files/ipt-2.0.5-security-update-1.war',
   $iptname		= 'ipt-2.0.5-security-update-1',  
   $deployroot		= '/var/lib/tomcat6/webapps',
-  )
+  $tomcatuser		= 'tomcat6',
+  $tomcatgroup		= 'tomcat6',
+  $JAVA_OPTS		= '-Djava.awt.headless=true -Xmx256m -XX:+UseConcMarkSweepGC',
+  $backup 		= false,
+  $restore 		= false,
+  $filetorestore	= 'data/ipt',
+  $backuphour 		= 2,
+  $backupminute 	= 15,
+  $version 		= 'latest',
+  $bucket 		= 'ipt',
+  $bucketfolder 	= 'backups',
+  $dest_id 		= undef,
+  $dest_key 		= undef,
+  $cloud 		= 's3',
+  $pubkey_id 		= undef,
+  $full_if_older_than 	= undef,
+  $remove_older_than 	= undef,  )
 {
   file { $datarootdirs:
     ensure         => 'directory',
@@ -50,13 +42,16 @@ class ipt-toolkit (
 
   file { $datadir:
     ensure         => 'directory',
-    mode           => '0777',
+    mode           => '0700',
+    owner	   => $tomcatuser,
+    group	   => $tomcatgroup,
     require	   => File[$datarootdirs],
   }
+  
   class { "tomcat": 
-    puppi    => true,
+    puppi    	=> true,
   }
-
+ 
   puppi::project::war { "ipt-toolkit":
     source           => $iptsource,
     deploy_root      => $deployroot,
@@ -65,12 +60,79 @@ class ipt-toolkit (
     always_deploy    => true,
     clean_deploy     => true,
     require	     => Class['tomcat'],
-
   }
 
-  file { "${deployroot}/${iptname}/datadir.location":
+  exec { "Run_Puppi_ipt":
+    command => 'puppi deploy ipt-toolkit',
+    path    => '/bin:/sbin:/usr/sbin:/usr/bin',
+    timeout => $timeout,
+  }     
+
+  file { "${deployroot}/${iptname}/WEB-INF/datadir.location":
     content 	     => template('ipt-toolkit/datadir.location.erb'),
-    mode             => '0600',
-    require          => Exec['Run_Puppi_ipt-toolkit'],
- }   
+    mode             => '0644',
+    owner	     => $tomcatuser,
+    group	     => $tomcatgroup,
+    require          => Exec['Run_Puppi_ipt'],
+  }
+
+  file { "/etc/default/tomcat6":
+    content 	     => template('ipt-toolkit/tomcat6.erb'),
+    mode             => '0644',
+    require          => Exec['Run_Puppi_ipt'],
+  }   
+
+  exec { "restart_tomcat6":
+    command 	    => 'service tomcat6 restart',
+    path    	    => '/bin:/sbin:/usr/sbin:/usr/bin',
+    timeout 	    => $timeout,
+    require	    => File['/etc/default/tomcat6'],
+  }
+
+# Add hostname to /etc/hosts, svn checkout requires a resolvable hostname
+  host { 'localhost':
+    ip => '127.0.0.1',
+    host_aliases => [ $hostname ],
+  }
+
+ if $backup == true {
+    class { 'ipt-toolkit::backup':
+      backuphour         => $backuphour,
+      backupminute       => $backupminute,
+      backupdir          => $datadir,
+      bucket             => $bucket,
+      folder             => $bucketfolder,   
+      dest_id            => $dest_id,
+      dest_key           => $dest_key,
+      cloud              => $cloud,
+      pubkey_id          => $pubkey_id,
+      full_if_older_than => $full_if_older_than,
+      remove_older_than  => $remove_older_than,
+    }
+  }
+
+  if $restore == true {
+    class { 'ipt-toolkit::restore':
+      version     => $restoreversion,
+      filetorestore => $filetorestore,
+      datadir     => $datadir,
+      restore_directory => $datadir,
+      bucket      => $bucket,
+      folder      => $bucketfolder,   
+      dest_id     => $dest_id,
+      dest_key    => $dest_key,
+      cloud       => $cloud,
+      pubkey_id   => $pubkey_id,
+    }
+  }
+
+  if $proxysite == true {
+    class { 'ipt-toolkit::proxy':
+      proxy_pass 	=> [{ 'path' => '/', 'url' => "http://localhost:8080/${iptname}/" }],
+      priority		=> $proxyvhostpriority,
+      port		=> $proxyport,
+      name		=> $sitename,
+    }
+  }
+
 }
