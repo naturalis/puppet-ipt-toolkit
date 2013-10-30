@@ -33,7 +33,9 @@ class ipt-toolkit (
   $cloud 		= 's3',
   $pubkey_id 		= undef,
   $full_if_older_than 	= undef,
-  $remove_older_than 	= undef,  )
+  $remove_older_than 	= undef,
+  $timeout		= 300,
+  )
 {
   file { $datarootdirs:
     ensure         => 'directory',
@@ -52,20 +54,18 @@ class ipt-toolkit (
     puppi    	=> true,
   }
  
-  puppi::project::war { "ipt-toolkit":
-    source           => $iptsource,
-    deploy_root      => $deployroot,
-    enable	     => true,
-    auto_deploy	     => true,
-    always_deploy    => true,
-    clean_deploy     => true,
-    require	     => Class['tomcat'],
+  
+  class {"ipt-toolkit::puppideploy":
+      source           => $iptsource,
+      deploy_root      => $deployroot,
+      require	     => Class['tomcat'],
   }
 
   exec { "Run_Puppi_ipt":
-    command => 'puppi deploy ipt-toolkit',
-    path    => '/bin:/sbin:/usr/sbin:/usr/bin',
-    timeout => $timeout,
+    command 	     => 'puppi deploy ipt-toolkit',
+    path    	     => '/bin:/sbin:/usr/sbin:/usr/bin',
+    timeout 	     => $timeout,
+    require	     => Class['ipt-toolkit::puppideploy'],
   }     
 
   file { "${deployroot}/${iptname}/WEB-INF/datadir.location":
@@ -79,7 +79,7 @@ class ipt-toolkit (
   file { "/etc/default/tomcat6":
     content 	     => template('ipt-toolkit/tomcat6.erb'),
     mode             => '0644',
-    require          => Exec['Run_Puppi_ipt'],
+    require          => Class['tomcat'],
   }   
 
   exec { "restart_tomcat6":
