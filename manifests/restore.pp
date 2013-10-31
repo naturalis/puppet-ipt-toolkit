@@ -2,15 +2,15 @@
 # class ipt-toolkit::restore
 #
 class ipt-toolkit::restore (
-  $version = undef,
-  $bucket = undef,
-  $folder = undef,
-  $dest_id = undef,
-  $dest_key = undef,
-  $cloud = undef,
-  $pubkey_id = undef,
-  $filetorestore = undef,
-  $datadir = undef,
+  $version           = undef,
+  $bucket            = undef,
+  $folder            = undef,
+  $dest_id           = undef,
+  $dest_key          = undef,
+  $cloud             = undef,
+  $pubkey_id         = undef,
+  $filetorestore     = undef,
+  $datadir           = undef,
   $restore_directory = undef,
 )
 {
@@ -23,9 +23,8 @@ class ipt-toolkit::restore (
   duplicity::restore { 'data':
     directory      => $datadir,
     filetorestore  => $filetorestore,
-#    restore_directory => $restore_directory,
     bucket         => $bucket,
-    folder	   => $folder,
+    folder         => $folder,
     dest_id        => $dest_id,
     dest_key       => $dest_key,
     cloud          => $cloud,
