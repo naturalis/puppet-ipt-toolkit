@@ -128,7 +128,7 @@ class ipt-toolkit (
 
   if $proxysite == true {
     class { 'ipt-toolkit::proxy':
-      proxy_pass                        => [{ 'path' => '/', 'url' => "http://localhost:8080/${iptname}/" }],
+      proxy_pass                        => [{ 'path' => "/${iptname}", 'url' => "http://localhost:8080/${iptname}/" },{ 'path' => '/', 'url' => "http://localhost:8080/${iptname}/" }],
       proxy_pass_preserve_host          => true,
       proxy_pass_reverse_cookie_path    => [{ 'path' => '/', 'url' => "/${iptname}" }],
       priority                          => $proxyvhostpriority,
